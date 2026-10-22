@@ -1,0 +1,335 @@
+---
+title: "DATA 606 Data Project Proposal"
+author: "Patricio Romero"
+date: today
+format:
+  html:
+    toc: true
+    code-fold: true
+    theme: flatly
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+### Data Preparation
+
+The first step is to load the required packages and import the NYCHA electricity dataset.
+
+```{r data-preparation, echo=TRUE, results='hide', warning=FALSE, message=FALSE}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+library(scales)
+
+nycha <- read_csv(
+  "Data/Electric_Consumption_And_Cost_(2010_-_Sep_2025)_20261018.csv",
+  show_col_types = FALSE
+)
+```
+
+The dataset is imported into R and stored in an object named `nycha`.
+
+### Research question
+
+How is electricity consumption associated with electricity cost among NYCHA housing developments in New York City, and how does this relationship vary across boroughs?
+
+This question is limited to the NYCHA billing records included in the dataset. The results cannot be generalized to all buildings in New York City.
+
+### Cases
+
+The cases are monthly electricity billing records for NYCHA housing developments. Each row represents an electricity record for a development during a specific billing period.
+
+```{r cases}
+nycha_cases <- nycha |>
+  transmute(
+    development_name = `Development Name`,
+    borough = Borough,
+    revenue_month = `Revenue Month`,
+    consumption_kwh = parse_number(as.character(`Consumption (KWH)`)),
+    current_charges = parse_number(as.character(`Current Charges`))
+  )
+
+cases_summary <- nycha_cases |>
+  summarise(
+    total_cases = n(),
+    total_developments = n_distinct(development_name),
+    total_boroughs = n_distinct(borough)
+  )
+
+kable(
+  cases_summary,
+  col.names = c(
+    "Total Cases",
+    "Total Developments",
+    "Total Boroughs"
+  ),
+  caption = "Summary of NYCHA Cases"
+)
+```
+
+The output shows the total number of billing records, developments, and boroughs represented in the dataset.
+
+### Data collection
+
+The data were collected from administrative electricity billing records for New York City Housing Authority developments. The records contain electricity consumption and cost information associated with developments, boroughs, and billing periods.
+
+### Type of study
+
+This is an observational study. The researcher did not assign electricity usage, electricity cost, borough, or billing period. Therefore, the analysis can describe associations but cannot establish causation.
+
+### Data Source
+
+The data were obtained from NYC Open Data.
+
+**Dataset:** Electric Consumption and Cost  
+**Publisher:** New York City Housing Authority  
+**Source:** [NYC Open Data — Electric Consumption and Cost](https://data.cityofnewyork.us/d/jr24-e7cr)
+
+The original file is stored in:
+
+```text
+Data/Electric_Consumption_And_Cost_(2010_-_Sep_2025)_20261018.csv
+```
+
+### Describe your variables
+
+The following chunk selects and prepares the variables used in the analysis.
+
+```{r variables}
+nycha_clean <- nycha |>
+  transmute(
+    development_name = `Development Name`,
+    borough = Borough,
+    revenue_month = `Revenue Month`,
+    consumption_kwh = parse_number(as.character(`Consumption (KWH)`)),
+    current_charges = parse_number(as.character(`Current Charges`)),
+    kwh_charges = parse_number(as.character(`KWH Charges`))
+  ) |>
+  mutate(borough = toupper(trimws(borough)))
+
+valid_boroughs <- c(
+  "BRONX",
+  "BROOKLYN",
+  "MANHATTAN",
+  "QUEENS",
+  "STATEN ISLAND"
+)
+
+glimpse(nycha_clean)
+```
+
+`development_name` and `borough` are qualitative variables. `revenue_month` is a time variable. `consumption_kwh`, `current_charges`, and `kwh_charges` are quantitative variables.
+
+The main outcome variable is `current_charges`, and the main comparison variable is `consumption_kwh`. Borough will be used to compare the records across locations. The scatter plot includes a visual linear trend line to help describe the direction of the association. The trend line is used for visualization and is not presented as an inferential regression model. If a regression model were used, `current_charges` would be the dependent variable.
+
+### Relevant summary statistics
+
+The following chunk calculates summary statistics for electricity consumption and electricity cost.
+
+```{r summary-statistics}
+consumption_statistics <- nycha_clean |>
+  summarise(
+    observations = n(),
+    mean_consumption = mean(consumption_kwh, na.rm = TRUE) / 1000,
+    median_consumption = median(consumption_kwh, na.rm = TRUE) / 1000,
+    sd_consumption = sd(consumption_kwh, na.rm = TRUE) / 1000,
+    minimum_consumption = min(consumption_kwh, na.rm = TRUE) / 1000,
+    maximum_consumption = max(consumption_kwh, na.rm = TRUE) / 1000
+  )
+
+kable(
+  consumption_statistics,
+  digits = 2,
+  col.names = c(
+    "Observations",
+    "Mean Consumption (MWh)",
+    "Median Consumption (MWh)",
+    "Standard Deviation (MWh)",
+    "Minimum Consumption (MWh)",
+    "Maximum Consumption (MWh)"
+  ),
+  format.args = list(big.mark = ","),
+  caption = "Summary Statistics for Electricity Consumption"
+)
+
+cost_statistics <- nycha_clean |>
+  summarise(
+    observations = n(),
+    mean_cost = mean(current_charges, na.rm = TRUE),
+    median_cost = median(current_charges, na.rm = TRUE),
+    sd_cost = sd(current_charges, na.rm = TRUE),
+    minimum_cost = min(current_charges, na.rm = TRUE),
+    maximum_cost = max(current_charges, na.rm = TRUE)
+  )
+
+kable(
+  cost_statistics |>
+    mutate(
+      across(
+        -observations,
+        ~ dollar(.x, accuracy = 0.01)
+      )
+    ),
+  col.names = c(
+    "Observations",
+    "Mean Cost (USD)",
+    "Median Cost (USD)",
+    "Standard Deviation (USD)",
+    "Minimum Cost (USD)",
+    "Maximum Cost (USD)"
+  ),
+  caption = "Summary Statistics for Electricity Cost"
+)
+```
+
+The first table reports the number of observations, mean, median, standard deviation, minimum, and maximum for electricity consumption. The second table reports the same statistics for electricity cost. Separating the variables makes the results easier to read and compare.
+
+### Summary statistics by borough
+
+```{r borough-summary}
+borough_summary <- nycha_clean |>
+  filter(
+    borough %in% valid_boroughs,
+    !is.na(borough),
+    !is.na(consumption_kwh),
+    !is.na(current_charges)
+  ) |>
+  group_by(borough) |>
+  summarise(
+    observations = n(),
+    average_consumption = mean(consumption_kwh, na.rm = TRUE) / 1000,
+    median_consumption = median(consumption_kwh, na.rm = TRUE) / 1000,
+    average_cost = mean(current_charges, na.rm = TRUE),
+    median_cost = median(current_charges, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  arrange(desc(average_consumption))
+
+kable(
+  borough_summary |>
+    mutate(
+      across(
+        c(average_cost, median_cost),
+        ~ dollar(.x, accuracy = 0.01)
+      )
+    ),
+  digits = 2,
+  format.args = list(big.mark = ","),
+  col.names = c(
+    "Borough",
+    "Observations",
+    "Average Consumption (MWh)",
+    "Median Consumption (MWh)",
+    "Average Cost (USD)",
+    "Median Cost (USD)"
+  ),
+  caption = "Electricity Consumption and Cost by Borough"
+)
+```
+
+This table compares the typical electricity consumption and electricity cost among the boroughs.
+
+### Frequency of qualitative variables
+
+The following table reports the number of records for each borough. This summarizes the qualitative variable used in the analysis.
+
+```{r borough-frequency}
+borough_frequency <- nycha_clean |>
+  count(borough, sort = TRUE)
+
+kable(
+  borough_frequency,
+  col.names = c("Borough", "Observations"),
+  caption = "Number of Records by Borough"
+)
+```
+
+This table shows how many electricity records are available for each borough.
+
+### Visualization: Electricity consumption and cost
+
+```{r consumption-cost-plot, fig-width=12, fig-height=7}
+ggplot(
+  nycha_clean |>
+    filter(
+      borough %in% valid_boroughs,
+      !is.na(consumption_kwh),
+      !is.na(current_charges)
+    ),
+  aes(
+    x = consumption_kwh / 1000,
+    y = current_charges,
+    color = borough
+  )
+) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(
+    method = "lm",
+    se = FALSE
+  ) +
+  scale_x_continuous(
+    trans = pseudo_log_trans(sigma = 10),
+    breaks = c(0, 500, 1000, 1500, 2000, 2500, 3000),
+    labels = comma,
+    name = "Electricity consumption (MWh)"
+  ) +
+  scale_y_continuous(
+    labels = dollar_format(
+      accuracy = 1,
+      scale = 1
+    )
+  ) +
+  coord_cartesian(xlim = c(0, 3000)) +
+  labs(
+    title = "Electricity Consumption and Cost by Borough",
+    x = "Electricity consumption (MWh)",
+    y = "Current charges (USD)",
+    color = "Borough"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 1,
+      vjust = 1
+    )
+  )
+```
+
+Each point represents one electricity billing record. The plot examines whether higher electricity consumption tends to be associated with higher electricity cost.
+
+### Visualization: Electricity cost by borough
+
+```{r cost-boxplot}
+ggplot(
+  nycha_clean |>
+    filter(
+      borough %in% valid_boroughs,
+      !is.na(borough),
+      !is.na(current_charges)
+    ),
+  aes(x = borough, y = current_charges, fill = borough)
+) +
+  geom_boxplot(alpha = 0.7, outlier.alpha = 0.25) +
+  scale_y_continuous(
+    labels = dollar_format(
+      accuracy = 1,
+      scale = 1
+    )
+  ) +
+  labs(
+    title = "Distribution of Electricity Charges by Borough",
+    x = "Borough",
+    y = "Current charges (USD)"
+  ) +
+  coord_flip() +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+This boxplot compares the median, variability, and possible outliers of electricity charges across boroughs.
+
