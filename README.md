@@ -58,6 +58,8 @@ The project uses R and Quarto to:
 ## Repository Structure
 
 - [`01-Project-Proposal/`](01-Project-Proposal/) — original project proposal.
+  - [Quarto source](01-Project-Proposal/DATA606-Final-Project.qmd)
+  - [HTML proposal](01-Project-Proposal/DATA606-Final-Project.html)
   - [Proposal PDF](01-Project-Proposal/DATA%20606%20Data%20Project%20Proposal.pdf)
 - [`02-Final-Report/`](02-Final-Report/) — final report source and rendered outputs.
   - [Quarto source](02-Final-Report/DATA606-Final-Project.qmd)
