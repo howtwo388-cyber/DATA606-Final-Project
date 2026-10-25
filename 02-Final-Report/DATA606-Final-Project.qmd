@@ -1,0 +1,505 @@
+---
+title: "DATA 606 Final Project: NYCHA Electricity Consumption and Cost"
+author: "Patricio Romero"
+date: "2026-12-18"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: true
+    theme: cosmo
+    embed-resources: true
+    css: report-style.css
+---
+
+```{r setup, echo=TRUE, warning=FALSE, message=FALSE}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(scales)
+library(broom)
+
+nycha <- read_csv(
+  "../Data/Electric_Consumption_And_Cost_(2010_-_Sep_2025)_20261018.csv",
+  show_col_types = FALSE
+)
+
+nycha_clean <- nycha %>%
+  transmute(
+    development_name = `Development Name`,
+    borough = `Borough`,
+    revenue_month = `Revenue Month`,
+    consumption_kwh = parse_number(as.character(`Consumption (KWH)`)),
+    current_charges = parse_number(as.character(`Current Charges`)),
+    kwh_charges = parse_number(as.character(`KWH Charges`))
+  ) %>%
+  filter(!is.na(borough), !is.na(consumption_kwh), !is.na(current_charges)) %>%
+  mutate(
+    consumption_mwh = consumption_kwh / 1000,
+    borough = factor(
+      borough,
+      levels = c("BRONX", "BROOKLYN", "MANHATTAN", "QUEENS", "STATEN ISLAND")
+    )
+  ) %>%
+  filter(!is.na(borough))
+```
+
+# Abstract
+
+This project studies the relationship between electricity consumption and electricity cost in New York City Housing Authority (NYCHA) developments. The data contain monthly electricity billing records for NYCHA developments in the Bronx, Brooklyn, Manhattan, Queens, and Staten Island.
+
+The analysis uses R and Quarto. The data were cleaned, and electricity consumption was converted from kilowatt-hours to megawatt-hours. Summary statistics, tables, scatter plots, and boxplots were used to compare consumption and costs across boroughs. A multiple linear regression model was fitted to study how electricity consumption is related to current charges while considering borough differences.
+
+The results show a positive relationship between electricity consumption and electricity cost. Billing records with higher consumption generally have higher electricity charges. The model estimates an increase of approximately \$115.79 per additional MWh and explains 79.33% of the observed variation in electricity charges. Charges also vary across boroughs.
+
+Overall, electricity consumption is an important factor related to electricity cost in NYCHA developments. However, this analysis describes NYCHA records only and cannot be generalized to all buildings in New York City. Other factors, such as building size, occupancy, weather, and utility rates, may also affect electricity costs.
+
+# Part 1 - Introduction
+
+## Background
+
+Electricity is an important part of daily life in NYCHA housing developments. Residents use electricity for lighting, heating, cooling, appliances, and other basic needs. Electricity costs can affect the NYCHA budget and the cost of maintaining public housing.
+
+Studying electricity consumption and cost can help identify patterns across housing developments and boroughs. It can also show whether higher electricity use is related to higher electricity charges. This information may help NYCHA understand energy use, plan budgets, and identify possible opportunities to improve energy efficiency.
+
+## Research question
+
+How is electricity consumption associated with electricity cost among NYCHA housing developments in New York City, and how does this relationship vary across boroughs?
+
+## Scope of inference
+
+This analysis describes the observed NYCHA electricity records. The results should not be generalized to all buildings in New York City.
+
+# Part 2 - Data
+
+## Data source
+
+The data were obtained from NYC Open Data. The dataset is published by the New York City Housing Authority (NYCHA).
+
+Source: [NYC Open Data - Electric Consumption and Cost](https://data.cityofnewyork.us/d/jr24-e7cr)
+
+## Cases and observations
+
+```{r cases-summary, echo=TRUE, warning=FALSE, message=FALSE}
+library(knitr)
+
+dataset_summary <- data.frame(
+  Description = c("Rows (Cases)", "Columns (Variables)"),
+  Count = c(
+    format(nrow(nycha_clean), big.mark = ","),
+    as.character(ncol(nycha_clean))
+  ),
+  Meaning = c(
+    "Total number of electricity billing records",
+    "Total number of variables in the dataset"
+  )
+)
+
+kable(
+  dataset_summary,
+  caption = "Table 1. Dataset Summary After Cleaning",
+  align = c("l", "r", "l")
+)
+```
+
+Each case represents an electricity billing record for a NYCHA development and billing period.
+
+## Variables
+
+- `consumption_kwh`: electricity consumption in kilowatt-hours.
+- `consumption_mwh`: electricity consumption converted to megawatt-hours.
+- `current_charges`: electricity charges in U.S. dollars.
+- `borough`: New York City borough, a categorical variable.
+- `revenue_month`: billing month.
+
+## Data collection and study type
+
+The data were collected through administrative electricity billing records. This is an observational study because the researcher did not assign electricity consumption, costs, boroughs, or billing periods.
+
+# Part 3 - Exploratory Data Analysis
+
+## Summary statistics
+
+```{r summary-statistics, echo=TRUE, warning=FALSE, message=FALSE}
+library(dplyr)
+library(knitr)
+
+stats <- nycha_clean %>%
+  summarise(
+    Observations = n(),
+    Mean_Consumption_MWh = mean(consumption_mwh, na.rm = TRUE),
+    Median_Consumption_MWh = median(consumption_mwh, na.rm = TRUE),
+    Mean_Cost_USD = mean(current_charges, na.rm = TRUE),
+    Median_Cost_USD = median(current_charges, na.rm = TRUE),
+    SD_Cost_USD = sd(current_charges, na.rm = TRUE)
+  )
+
+summary_table <- data.frame(
+  Statistic = c(
+    "Total observations",
+    "Mean electricity consumption",
+    "Median electricity consumption",
+    "Mean electricity cost",
+    "Median electricity cost",
+    "Standard deviation of cost"
+  ),
+  Value = c(
+    format(stats$Observations, big.mark = ","),
+    sprintf("%.1f", stats$Mean_Consumption_MWh),
+    sprintf("%.1f", stats$Median_Consumption_MWh),
+    paste0("$", format(round(stats$Mean_Cost_USD), big.mark = ",")),
+    paste0("$", format(round(stats$Median_Cost_USD), big.mark = ",")),
+    paste0("$", format(round(stats$SD_Cost_USD), big.mark = ","))
+  ),
+  Unit = c(
+    "Billing records",
+    "MWh",
+    "MWh",
+    "USD",
+    "USD",
+    "USD"
+  )
+)
+
+knitr::kable(
+  summary_table,
+  caption = "Table 2. Summary Statistics for NYCHA Electricity Data",
+  align = c("l", "r", "l")
+)
+```
+
+Table 2 shows the summary statistics for electricity consumption and costs across NYCHA billing records. The average electricity consumption is 30.1 MWh per billing record, while the median is 11.6 MWh. This difference suggests that most records have relatively low electricity consumption, while some have much higher values.
+
+The average electricity cost is approximately \$4,312 per billing record. These results suggest that electricity consumption varies considerably across NYCHA billing records, which may also contribute to differences in electricity costs.
+
+## Records by borough
+
+```{r records-by-borough, echo=TRUE, warning=FALSE, message=FALSE}
+library(dplyr)
+library(knitr)
+
+borough_table <- nycha_clean %>%
+  count(borough, name = "Records") %>%
+  mutate(
+    Percentage = round(100 * Records / sum(Records), 1)
+  ) %>%
+  arrange(desc(Records))
+
+borough_table %>%
+  mutate(
+    Records = format(Records, big.mark = ","),
+    Percentage = paste0(Percentage, "%")
+  ) %>%
+  knitr::kable(
+    caption = "Table 3. Electricity Billing Records by Borough",
+    col.names = c("Borough", "Billing Records", "Percentage"),
+    align = c("l", "r", "r")
+  )
+```
+
+Table 3 shows the number and percentage of electricity billing records across the five New York City boroughs. The distribution of records varies by borough, indicating that some boroughs have more billing activity represented in the dataset than others.
+
+These differences are important because boroughs with more billing records may have higher total electricity consumption and costs. Therefore, comparing average and median values per billing record will help us better understand the differences in electricity consumption and costs between boroughs.
+
+## Electricity consumption and cost
+
+```{r consumption-cost-borough, echo=TRUE, warning=FALSE, message=FALSE, fig.width=12, fig.height=10, out.width="100%", fig.align="center"}
+library(dplyr)
+library(ggplot2)
+library(scales)
+
+valid_boroughs <- c(
+  "BRONX", "BROOKLYN", "MANHATTAN",
+  "QUEENS", "STATEN ISLAND"
+)
+
+nycha_plot <- nycha_clean %>%
+  filter(
+    borough %in% valid_boroughs,
+    !is.na(consumption_mwh),
+    !is.na(current_charges)
+  )
+
+ggplot(
+  nycha_plot,
+  aes(
+    x = consumption_mwh,
+    y = current_charges
+  )
+) +
+  geom_point(
+    color = "steelblue",
+    alpha = 0.08,
+    size = 0.35
+  ) +
+  geom_smooth(
+    method = "lm",
+    color = "red",
+    linewidth = 0.8,
+    se = FALSE
+  ) +
+  facet_wrap(
+    ~ borough,
+    ncol = 2
+  ) +
+  scale_x_continuous(
+    trans = pseudo_log_trans(sigma = 10),
+    breaks = c(0, 10, 50, 100, 250, 500, 1000),
+    labels = comma
+  ) +
+  scale_y_continuous(
+    trans = pseudo_log_trans(sigma = 1000),
+    breaks = c(
+      -10000, 0, 1000, 5000,
+      10000, 25000, 50000,
+      100000, 250000
+    ),
+    labels = label_dollar()
+  ) +
+  coord_cartesian(
+    xlim = c(0, 1000),
+    ylim = c(-10000, 250000)
+  ) +
+  labs(
+    title = "Electricity Consumption and Cost by Borough",
+    subtitle = "Five borough comparisons using pseudo-logarithmic scales",
+    x = "Electricity Consumption (MWh)",
+    y = "Current Charges (USD)"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    strip.text = element_text(
+      face = "bold",
+      size = 14
+    ),
+    plot.title = element_text(
+      face = "bold",
+      size = 18
+    ),
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 1
+    ),
+    panel.spacing = unit(1.5, "lines")
+  )
+```
+
+Figure 1 shows the relationship between electricity consumption and electricity charges across the five New York City boroughs. The results show a positive relationship in all five boroughs, meaning that higher electricity consumption is generally associated with higher electricity costs.
+
+However, the relationship is not exactly the same across boroughs. Some billing records have higher charges than others, even at similar consumption levels. This suggests that electricity consumption is an important factor in determining costs, but other factors may also influence electricity charges.
+
+The results also show some unusually high electricity consumption and cost values. These differences suggest that electricity expenses vary considerably across NYCHA billing records.
+
+## Electricity cost by borough
+
+```{r charges-by-borough, echo=TRUE, warning=FALSE, message=FALSE, fig.width=11, fig.height=6.5, out.width="100%", fig.align="center"}
+library(dplyr)
+library(ggplot2)
+library(scales)
+
+valid_boroughs <- c(
+  "BRONX",
+  "BROOKLYN",
+  "MANHATTAN",
+  "QUEENS",
+  "STATEN ISLAND"
+)
+
+ggplot(
+  nycha_clean |>
+    filter(
+      borough %in% valid_boroughs,
+      !is.na(current_charges)
+    ),
+  aes(
+    x = borough,
+    y = current_charges,
+    fill = borough
+  )
+) +
+  geom_boxplot(
+    alpha = 0.7,
+    outlier.alpha = 0.25
+  ) +
+  scale_y_continuous(
+    trans = pseudo_log_trans(sigma = 1000),
+    breaks = c(
+      -25000, -10000, -5000, 0,
+      1000, 5000, 10000, 50000,
+      100000, 350000
+    ),
+    labels = dollar_format(accuracy = 1)
+  ) +
+  labs(
+    title = "Distribution of Electricity Charges by Borough",
+    subtitle = "Pseudo-logarithmic scale",
+    x = "Borough",
+    y = "Current charges (USD)"
+  ) +
+  coord_flip() +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "none"
+  )
+```
+
+Figure 2 shows the distribution of electricity charges across the five boroughs. Most billing records have relatively low costs, while some have unusually high charges. The differences in median costs and variation suggest that electricity expenses are not the same across boroughs. These results show the importance of comparing typical electricity costs rather than relying only on averages.
+
+### Analysis of Electricity Consumption and Cost by Borough
+
+Figures 1 and 2 show that higher electricity consumption is generally associated with higher electricity charges across the five boroughs. However, electricity costs vary between boroughs, even at similar consumption levels.
+
+Most billing records have relatively low charges, while some have unusually high costs. A few records also have negative charges, which may be related to billing adjustments or credits.
+
+Overall, the results suggest that electricity consumption is an important factor associated with electricity costs, but other factors, such as electricity rates and building characteristics, may also contribute to these differences.
+
+# Part 4 - Inference
+
+## Proposed statistical model
+
+This study uses a multiple linear regression model to examine the relationship between electricity consumption and electricity costs across NYCHA housing developments. The response variable is electricity charges (`current_charges`), measured in U.S. dollars. The explanatory variables are electricity consumption (`consumption_mwh`) and borough.
+
+The model examines how electricity consumption is associated with electricity charges while accounting for differences between the five boroughs.
+
+## Regression model
+
+```{r regression-model, echo=TRUE, warning=FALSE, message=FALSE}
+library(broom)
+library(dplyr)
+library(knitr)
+
+electricity_model <- lm(
+  current_charges ~ consumption_mwh + borough,
+  data = nycha_clean
+)
+
+regression_table <- broom::tidy(electricity_model) %>%
+  mutate(
+    estimate = round(estimate, 2),
+    std.error = round(std.error, 2),
+    statistic = round(statistic, 2),
+    p.value = format.pval(p.value, digits = 3, eps = 0.001)
+  )
+
+knitr::kable(
+  regression_table,
+  caption = "Table 4. Multiple Linear Regression Results",
+  col.names = c(
+    "Variable",
+    "Coefficient",
+    "Standard Error",
+    "t-value",
+    "p-value"
+  ),
+  align = c("l", "r", "r", "r", "r")
+)
+```
+
+The t-value and p-value help us evaluate the statistical evidence for each regression coefficient. A larger absolute t-value generally indicates stronger evidence that a coefficient is different from zero. A p-value below 0.05 suggests statistical significance under the model assumptions, while a p-value of 0.05 or higher does not provide sufficient evidence that the coefficient differs from zero. Because billing records may repeat for the same development, these p-values should be treated as preliminary.
+
+```{r regression-fit, echo=TRUE, warning=FALSE, message=FALSE}
+model_fit <- broom::glance(electricity_model)
+
+fit_table <- data.frame(
+  Statistic = c(
+    "R-squared",
+    "Adjusted R-squared",
+    "Number of observations"
+  ),
+  Value = c(
+    sprintf("%.4f", model_fit$r.squared),
+    sprintf("%.4f", model_fit$adj.r.squared),
+    format(model_fit$nobs, big.mark = ",")
+  )
+)
+
+knitr::kable(
+  fit_table,
+  caption = "Table 5. Regression Model Summary",
+  align = c("l", "r")
+)
+```
+
+### Regression Model Analysis
+
+Tables 4 and 5 show the results of the multiple linear regression model using 547,893 NYCHA billing records. After accounting for borough, each additional MWh of electricity consumption is associated with an estimated **\$115.79 increase** in current charges.
+
+Using the Bronx as the reference borough, predicted charges at the same consumption level are **\$301.05 lower in Brooklyn**, **\$159.11 lower in Queens**, **\$27.57 higher in Manhattan**, and **\$702.21 higher in Staten Island**. All the reported p-values are below 0.05 under the standard linear regression assumptions. However, because multiple billing records may belong to the same development, these p-values should be interpreted cautiously.
+
+Table 5 reports an **R-squared of 0.7933**. This means electricity consumption and borough together account for approximately **79.33% of the observed variation** in electricity charges in this dataset. The model shows a strong association, but it does not establish that consumption or borough causes the observed cost differences.
+
+# Part 5 - Conclusion
+
+This study examined the relationship between electricity consumption and electricity costs across NYCHA housing developments in New York City.
+
+The results show a positive relationship between electricity consumption and electricity charges. In general, billing records with higher electricity consumption also have higher costs. The regression model estimates \$115.79 in additional charges per MWh, after accounting for borough.
+
+The model explains approximately 79.33% of the variation in electricity charges. It also shows differences in predicted charges across boroughs at the same consumption level. Some billing records have unusually high or negative charges, which may be related to billing adjustments, credits, or other factors not included in the dataset.
+
+These findings can help NYCHA better understand electricity spending, support budget planning, and identify areas for further investigation into energy efficiency.
+
+However, this study has some limitations. The data are observational, so the results do not establish causation. The dataset also does not include important factors such as building size, occupancy, weather, electricity rates, or billing adjustments. In addition, multiple billing records may come from the same housing development over time, so standard regression p-values may overstate the evidence of statistical significance.
+
+Overall, electricity consumption is an important factor associated with electricity costs, but additional information would be needed to better explain the differences between housing developments and boroughs.
+
+# References
+
+- NYC Open Data. *Electric Consumption and Cost*. New York City Housing Authority. https://data.cityofnewyork.us/d/jr24-e7cr
+
+# Appendix
+
+The R code for data preparation, summary statistics, visualizations, and regression is included in the collapsible code sections throughout this report.
+
+### AI Assistance: ChatGPT Use and Review
+
+**Purpose of AI assistance**
+
+I used ChatGPT to help review and improve my DATA 606 Final Project. The assistance focused on R code, data cleaning, statistical interpretation, tables, visualizations, and Quarto formatting.
+
+**Prompt 1: Final Project Review**
+
+The following is a consolidated review prompt describing the main instructions used during the project:
+
+> Please review my DATA 606 Final Project, "NYCHA Electricity Consumption and Cost." Check the data cleaning process, summary statistics, graphs, and multiple linear regression model. Verify that the results and interpretations are consistent. Identify errors, duplicated explanations, and formatting issues. Suggest corrections using simple academic English without changing or inventing statistical results.
+
+**ChatGPT response**
+
+This is a summary of the recommendations received, not a verbatim transcript:
+
+- Verify the cleaned dataset and borough classifications.
+- Check the regression coefficients and R-squared.
+- Improve the interpretation of statistical results.
+- Review graphs, tables, and labels.
+- Remove unnecessary or duplicated explanations.
+- Improve Quarto formatting and paragraph alignment.
+- Explain the limitations of observational data.
+
+**Prompt 2: Quarto Formatting**
+
+Original user request, translated from Spanish:
+
+> Give me the complete CSS code so I can replace the existing one.
+
+**ChatGPT response**
+
+ChatGPT provided a complete `report-style.css` stylesheet containing rules for justified paragraphs, report margins, headings, tables, figures, lists, and PDF printing.
+
+The complete response and CSS code should be included below or attached as a separate transcript if required by the instructor.
+
+**Changes made after AI review**
+
+1. Verified the cleaned dataset contained 547,893 observations and 7 variables.
+2. Reviewed the borough classifications and graph labels.
+3. Checked the multiple regression coefficient of $115.79 per MWh.
+4. Verified the R-squared value of 0.7933.
+5. Revised the interpretation of the statistical results.
+6. Improved the conclusions and limitations.
+7. Updated the CSS formatting for consistent margins and justified paragraphs.
+
+**Student verification and responsibility**
+
+I executed the R code in RStudio and reviewed the results. I checked the tables, graphs, and statistical interpretations before including them in the final report. I made the final decisions about the analysis and writing.
+
+ChatGPT was used to support the review and editing process. The statistical results were obtained from the dataset and R analysis, not generated by ChatGPT.

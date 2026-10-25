@@ -1,4 +1,4 @@
-DATA 606 Final Project
+# DATA 606 Final Project
 
 ## NYCHA Electricity Consumption and Cost
 
@@ -55,13 +55,17 @@ The project uses R and Quarto to:
 - Display electricity consumption in MWh.
 - Display electricity cost in USD.
 
-## Files
+## Repository Structure
 
-- `DATA606-Final-Project.qmd` — Quarto source file.
-- `DATA606-Final-Project.html` — Rendered HTML report.
-- `Data/` — Dataset folder.
-- `Data/Electric_Consumption_And_Cost_(2010_-_Sep_2025)_20261018.csv` — Original dataset.
-- `DATA 606 Data Project Proposal.pdf` — Proposal document.
+- [`01-Project-Proposal/`](01-Project-Proposal/) — original project proposal.
+  - [Proposal PDF](01-Project-Proposal/DATA%20606%20Data%20Project%20Proposal.pdf)
+- [`02-Final-Report/`](02-Final-Report/) — final report source and rendered outputs.
+  - [Quarto source](02-Final-Report/DATA606-Final-Project.qmd)
+  - [HTML report](02-Final-Report/DATA606-Final-Project.html)
+  - [PDF report](02-Final-Report/DATA606-Final-Project.pdf)
+  - [Report stylesheet](02-Final-Report/report-style.css)
+- [`Data/`](Data/) — original dataset, tracked with Git LFS.
+  - `Electric_Consumption_And_Cost_(2010_-_Sep_2025)_20261018.csv`
 
 ## Published Report
 
@@ -71,11 +75,13 @@ The published proposal is available on RPubs:
 
 ## How to Run the Project
 
-Open the project folder in RStudio and render the Quarto document:
+Clone the repository with Git LFS installed so that the dataset is downloaded correctly. Open the project folder in RStudio, or render from the repository root with:
 
-```r
-quarto::quarto_render("DATA606-Final-Project.qmd")
+```bash
+quarto render 02-Final-Report/DATA606-Final-Project.qmd
 ```
+
+The source document reads the dataset from `../Data/Electric_Consumption_And_Cost_(2010_-_Sep_2025)_20261018.csv`, relative to the final-report folder.
 
 The required R packages are:
 

@@ -1,0 +1,155 @@
+/* ==========================================
+   DATA 606 FINAL PROJECT
+   NYCHA Electricity Consumption and Cost
+   Report Formatting
+   ========================================== */
+
+/* Main report width and margins */
+#quarto-content {
+  max-width: 100%;
+}
+
+main.content,
+main#quarto-document-content {
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 28px;
+  padding-right: 28px;
+  box-sizing: border-box;
+}
+
+/* Justify all paragraphs */
+#quarto-document-content p,
+main.content p,
+p {
+  text-align: justify !important;
+  text-justify: inter-word;
+  line-height: 1.65;
+  hyphens: auto;
+  margin-bottom: 1em;
+}
+
+/* Headings aligned to the left */
+h1,
+h2,
+h3,
+h4 {
+  text-align: left !important;
+  margin-top: 1.5em;
+  margin-bottom: 0.7em;
+}
+
+/* Tables */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 0.94rem;
+}
+
+table th {
+  text-align: left;
+}
+
+table caption {
+  text-align: center;
+  caption-side: top;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+/* Figures and charts */
+.cell-output-display img,
+figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+figure {
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+figcaption {
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+/* Lists */
+ul,
+ol {
+  line-height: 1.6;
+}
+
+/* PDF printing */
+@media print {
+
+  @page {
+    size: letter;
+    margin: 0.75in;
+  }
+
+  main.content,
+  main#quarto-document-content {
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+
+  p {
+    text-align: justify !important;
+    line-height: 1.6;
+  }
+
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+
+  table,
+  figure {
+    break-inside: avoid;
+  }
+}
+
+/* Justify numbered and bulleted lists */
+#quarto-document-content li,
+#quarto-document-content li p,
+main.content li,
+main.content li p {
+  text-align: justify !important;
+  text-justify: inter-word;
+  line-height: 1.65;
+}
+
+/* Consistent list indentation */
+#quarto-document-content ul,
+#quarto-document-content ol {
+  padding-left: 1.8rem;
+  margin-bottom: 1rem;
+}
+
+/* Consistent list spacing */
+#quarto-document-content li {
+  margin-bottom: 0.4rem;
+}
+
+/* Keep section headings left aligned */
+#quarto-document-content h1,
+#quarto-document-content h2,
+#quarto-document-content h3,
+#quarto-document-content h4 {
+  text-align: left !important;
+}
