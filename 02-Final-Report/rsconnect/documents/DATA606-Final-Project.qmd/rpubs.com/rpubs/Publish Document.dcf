@@ -1,0 +1,10 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/1470323/83654cce78d14e1ab43742e888100361
+bundleId: https://api.rpubs.com/api/v1/document/1470323/83654cce78d14e1ab43742e888100361
+url: http://rpubs.com/howtwo3/1470323/edit
+version: 1
